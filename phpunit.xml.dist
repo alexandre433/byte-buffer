@@ -1,22 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<phpunit
-	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:noNamespaceSchemaLocation="http://gooh.github.com/phpunit-schema/3.7/phpunit.xsd"
-	backupGlobals="false"
-	backupStaticAttributes="false"
-	bootstrap="vendor/autoload.php"
-	colors="true">
-
-	<testsuites>
-		<testsuite name="TrafficCophp Bytebuffer Test Suite">
-			<directory suffix="Test.php">tests/TrafficCophp/ByteBuffer</directory>
-		</testsuite>
-	</testsuites>
-
-	<filter>
-		<whitelist>
-			<directory suffix=".php">src</directory>
-		</whitelist>
-	</filter>
-
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/12.0/phpunit.xsd" backupGlobals="false" bootstrap="vendor/autoload.php" colors="true" cacheDirectory=".phpunit.cache" backupStaticProperties="false">
+  <testsuites>
+    <testsuite name="TrafficCophp Bytebuffer Test Suite">
+      <directory suffix="Test.php">tests/TrafficCophp/ByteBuffer</directory>
+    </testsuite>
+  </testsuites>
+  <source>
+    <include>
+      <directory suffix=".php">src</directory>
+    </include>
+  </source>
 </phpunit>
