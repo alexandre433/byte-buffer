@@ -13,7 +13,7 @@ Installation should be done via [composer](http://packagist.org/).
 ```
 {
     "require": {
-        "TrafficCophp/ByteBuffer": "dev-master"
+        "trafficcophp/bytebuffer": "dev-master"
     }
 }
 ```
