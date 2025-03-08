@@ -2,11 +2,18 @@
 
 namespace TrafficCophp\ByteBuffer;
 
-interface WriteableBuffer {
-	public function write($string, $offset);
-	public function writeInt8($value, $offset);
-	public function writeInt16BE($value, $offset);
-	public function writeInt16LE($value, $offset);
-	public function writeInt32BE($value, $offset);
-	public function writeInt32LE($value, $offset);
+interface WriteableBuffer
+{
+    public function write($value, int $offset = 0): void;
+
+    public function writeInt8($value, int $offset = 0): void;
+
+    public function writeInt16BE($value, int $offset = 0): void;
+
+    public function writeInt16LE($value, int $offset = 0): void;
+
+    public function writeInt32BE($value, int $offset = 0): void;
+
+    public function writeInt32LE($value, int $offset = 0): void;
+
 }

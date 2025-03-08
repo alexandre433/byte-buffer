@@ -2,146 +2,160 @@
 
 namespace TrafficCophp\ByteBuffer;
 
-/**
- * ByteBuffer
- */
-class Buffer extends AbstractBuffer {
+use SplFixedArray;
+use TrafficCophp\ByteBuffer\AbstractBuffer;
+use TrafficCophp\ByteBuffer\FormatPackEnum;
 
-	const DEFAULT_FORMAT = 'x';
+class Buffer extends AbstractBuffer
+{
+    protected SplFixedArray $buffer;
 
-	/**
-	 * @var \SplFixedArray
-	 */
-	protected $buffer;
+    public function __construct($argument)
+    {
+        match (true) {
+            is_string($argument) => $this->initializeStructs(strlen($argument), $argument),
+            is_int($argument) => $this->initializeStructs($argument, pack(FormatPackEnum::x->value . "$argument")),
+            default => throw new \InvalidArgumentException('Constructor argument must be an binary string or integer')
+        };
+    }
 
-	/**
-	 * @var LengthMap
-	 */
-	protected $lengthMap;
+    public function __toString(): string
+    {
+        $buf = '';
+        foreach ($this->buffer as $bytes) {
+            $buf .= $bytes;
+        }
+        return $buf;
+    }
 
-	public function __construct($argument) {
-		$this->lengthMap = new LengthMap();
-		if (is_string($argument)) {
-			$this->initializeStructs(strlen($argument), $argument);
-		} else if (is_int($argument)) {
-			$this->initializeStructs($argument, pack(self::DEFAULT_FORMAT.$argument));
-		} else {
-			throw new \InvalidArgumentException('Constructor argument must be an binary string or integer');
-		}
-	}
+    protected function initializeStructs(string $length, string $content): void
+    {
+        $this->buffer = new SplFixedArray($length);
+        for ($i = 0; $i < $length; $i++) {
+            $this->buffer[$i] = $content[$i];
+        }
+    }
 
-	protected function initializeStructs($length, $content) {
-		$this->buffer = new \SplFixedArray($length);
-		for ($i = 0; $i < $length; $i++) {
-			$this->buffer[$i] = $content[$i];
-		}
-	}
+    protected function insert(FormatPackEnum|string $format, $value, int $offset, ?int $length): void
+    {
+        $bytes = pack($format?->value ?? $format, $value);
 
-	protected function insert($format, $value, $offset, $length) {
-		$bytes = pack($format, $value);
-		for ($i = 0; $i < strlen($bytes); $i++) {
-			$this->buffer[$offset++] = $bytes[$i];
-		}
-	}
+        if (null === $length) {
+            $length = strlen($bytes);
+        }
 
-	protected function extract($format, $offset, $length) {
-		$encoded = '';
-		for ($i = 0; $i < $length; $i++) {
-			$encoded .= $this->buffer->offsetGet($offset + $i);
-		}
-		if ($format == 'N'&& PHP_INT_SIZE <= 4) {
-			list(, $h, $l) = unpack('n*', $encoded);
-			$result = ($l + ($h * 0x010000));
-		} else if ($format == 'V' && PHP_INT_SIZE <= 4) {
-			list(, $h, $l) = unpack('v*', $encoded);
-			$result = ($h + ($l * 0x010000));
-		} else {
-			list(, $result) = unpack($format, $encoded);
-		}
-		return $result;
-	}
+        for ($i = 0; $i < strlen($bytes); $i++) {
+            $this->buffer[$offset++] = $bytes[$i];
+        }
+    }
 
-	protected function checkForOverSize($excpected_max, $actual) {
-		if ($actual > $excpected_max) {
-			throw new \InvalidArgumentException(sprintf('%d exceeded limit of %d', $actual, $excpected_max));
-		}
-	}
+    protected function extract(FormatPackEnum|string $format, int $offset, int $length)
+    {
+        $encoded = '';
+        for ($i = 0; $i < $length; $i++) {
+            $encoded .= $this->buffer->offsetGet($offset + $i);
+        }
 
-	public function __toString() {
-		$buf = '';
-		foreach ($this->buffer as $bytes) {
-			$buf .= $bytes;
-		}
-		return $buf;
-	}
+        if ($format == FormatPackEnum::N && PHP_INT_SIZE <= 4) {
+            [, $h, $l] = unpack('n*', $encoded);
+            $result = $l + $h * 0x010000;
+        } elseif ($format == FormatPackEnum::V && PHP_INT_SIZE <= 4) {
+            [, $h, $l] = unpack('v*', $encoded);
+            $result = $h + $l * 0x010000;
+        } else {
+            [, $result] = unpack($format?->value ?? $format, $encoded);
+        }
 
-	public function length() {
-		return $this->buffer->getSize();
-	}
+        return $result;
+    }
 
-	public function write($string, $offset) {
-		$length = strlen($string);
-		$this->insert('a' . $length, $string, $offset, $length);
-	}
+    protected function checkForOverSize($excpectedMax, string|int $actual): void
+    {
+        if ($actual > $excpectedMax) {
+            throw new \InvalidArgumentException(sprintf('%d exceeded limit of %d', $actual, $excpectedMax));
+        }
+    }
 
-	public function writeInt8($value, $offset) {
-		$format = 'C';
-		$this->checkForOverSize(0xff, $value);
-		$this->insert($format, $value, $offset, $this->lengthMap->getLengthFor($format));
-	}
 
-	public function writeInt16BE($value, $offset) {
-		$format = 'n';
-		$this->checkForOverSize(0xffff, $value);
-		$this->insert($format, $value, $offset, $this->lengthMap->getLengthFor($format));
-	}
 
-	public function writeInt16LE($value, $offset) {
-		$format = 'v';
-		$this->checkForOverSize(0xffff, $value);
-		$this->insert($format, $value, $offset, $this->lengthMap->getLengthFor($format));
-	}
+    public function length(): int
+    {
+        return $this->buffer->getSize();
+    }
 
-	public function writeInt32BE($value, $offset) {
-		$format = 'N';
-		$this->checkForOverSize(0xffffffff, $value);
-		$this->insert($format, $value, $offset, $this->lengthMap->getLengthFor($format));
-	}
+    public function write($value, int $offset = 0): void
+    {
+        $length = strlen($value);
+        $this->insert('a' . $length, $value, $offset, $length);
+    }
 
-	public function writeInt32LE($value, $offset) {
-		$format = 'V';
-		$this->checkForOverSize(0xffffffff, $value);
-		$this->insert($format, $value, $offset, $this->lengthMap->getLengthFor($format));
-	}
+    public function writeInt8($value, int $offset = 0): void
+    {
+        $format = FormatPackEnum::C;
+        $this->checkForOverSize(0xff, $value);
+        $this->insert($format, $value, $offset, $format->getLength());
+    }
 
-	public function read($offset, $length) {
-		$format = 'a' . $length;
-		return $this->extract($format, $offset, $length);
-	}
+    public function writeInt16BE($value, int $offset = 0): void
+    {
+        $format = FormatPackEnum::n;
+        $this->checkForOverSize(0xffff, $value);
+        $this->insert($format, $value, $offset, $format->getLength());
+    }
 
-	public function readInt8($offset) {
-		$format = 'C';
-		return $this->extract($format, $offset, $this->lengthMap->getLengthFor($format));
-	}
+    public function writeInt16LE($value, int $offset = 0): void
+    {
+        $format = FormatPackEnum::v;
+        $this->checkForOverSize(0xffff, $value);
+        $this->insert($format, $value, $offset, $format->getLength());
+    }
 
-	public function readInt16BE($offset) {
-		$format = 'n';
-		return $this->extract($format, $offset, $this->lengthMap->getLengthFor($format));
-	}
+    public function writeInt32BE($value, int $offset = 0): void
+    {
+        $format = FormatPackEnum::N;
+        $this->checkForOverSize(0xffffffff, $value);
+        $this->insert($format, $value, $offset, $format->getLength());
+    }
 
-	public function readInt16LE($offset) {
-		$format = 'v';
-		return $this->extract($format, $offset, $this->lengthMap->getLengthFor($format));
-	}
+    public function writeInt32LE($value, int $offset = 0): void
+    {
+        $format = FormatPackEnum::V;
+        $this->checkForOverSize(0xffffffff, $value);
+        $this->insert($format, $value, $offset, $format->getLength());
+    }
 
-	public function readInt32BE($offset) {
-		$format = 'N';
-		return $this->extract($format, $offset, $this->lengthMap->getLengthFor($format));
-	}
+    public function read(int $offset, int $length)
+    {
+        return $this->extract('a' . $length, $offset, $length);
+    }
 
-	public function readInt32LE($offset) {
-		$format = 'V';
-		return $this->extract($format, $offset, $this->lengthMap->getLengthFor($format));
-	}
+    public function readInt8(int $offset)
+    {
+        $format = FormatPackEnum::C;
+        return $this->extract($format, $offset, $format->getLength());
+    }
 
+    public function readInt16BE(int $offset)
+    {
+        $format = FormatPackEnum::n;
+        return $this->extract($format, $offset, $format->getLength());
+    }
+
+    public function readInt16LE(int $offset)
+    {
+        $format = FormatPackEnum::v;
+        return $this->extract($format, $offset, $format->getLength());
+    }
+
+    public function readInt32BE(int $offset)
+    {
+        $format = FormatPackEnum::N;
+        return $this->extract($format, $offset, $format->getLength());
+    }
+
+    public function readInt32LE(int $offset)
+    {
+        $format = FormatPackEnum::V;
+        return $this->extract($format, $offset, $format->getLength());
+    }
 }
