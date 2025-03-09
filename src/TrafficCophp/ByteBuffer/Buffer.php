@@ -28,6 +28,11 @@ class Buffer extends AbstractBuffer
         return $buf;
     }
 
+    public static function make($argument): static
+    {
+        return new static($argument);
+    }
+
     protected function initializeStructs(string $length, string $content): void
     {
         $this->buffer = new SplFixedArray($length);
@@ -36,7 +41,7 @@ class Buffer extends AbstractBuffer
         }
     }
 
-    protected function insert(FormatPackEnum|string $format, $value, int $offset, ?int $length): void
+    protected function insert(FormatPackEnum|string $format, $value, int $offset, ?int $length): self
     {
         $bytes = pack($format?->value ?? $format, $value);
 
@@ -47,6 +52,8 @@ class Buffer extends AbstractBuffer
         for ($i = 0; $i < strlen($bytes); $i++) {
             $this->buffer[$offset++] = $bytes[$i];
         }
+
+        return $this;
     }
 
     protected function extract(FormatPackEnum|string $format, int $offset, int $length)
@@ -69,59 +76,106 @@ class Buffer extends AbstractBuffer
         return $result;
     }
 
-    protected function checkForOverSize($excpectedMax, string|int $actual): void
+    protected function checkForOverSize($excpectedMax, string|int $actual): self
     {
         if ($actual > $excpectedMax) {
             throw new \InvalidArgumentException(sprintf('%d exceeded limit of %d', $actual, $excpectedMax));
         }
+
+        return $this;
     }
-
-
 
     public function length(): int
     {
         return $this->buffer->getSize();
     }
 
-    public function write($value, int $offset = 0): void
+    public function getLastEmptyPosition(): int
     {
-        $length = strlen($value);
-        $this->insert('a' . $length, $value, $offset, $length);
+        foreach($this->buffer as $key => $value) {
+            if (empty(trim($value))) {
+                return $key;
+            }
+        }
+
+        return 0;
     }
 
-    public function writeInt8($value, int $offset = 0): void
+    public function write($value, ?int $offset = null): self
     {
+        if (null === $offset) {
+            $offset = $this->getLastEmptyPosition();
+        }
+
+        $length = strlen($value);
+        $this->insert('a' . $length, $value, $offset, $length);
+
+        return $this;
+    }
+
+    public function writeInt8($value, ?int $offset = null): self
+    {
+        if (null === $offset) {
+            $offset = $this->getLastEmptyPosition();
+        }
+
         $format = FormatPackEnum::C;
         $this->checkForOverSize(0xff, $value);
         $this->insert($format, $value, $offset, $format->getLength());
+
+        return $this;
     }
 
-    public function writeInt16BE($value, int $offset = 0): void
+    public function writeInt16BE($value, ?int $offset = null): self
     {
+        if (null === $offset) {
+            $offset = $this->getLastEmptyPosition();
+        }
+
         $format = FormatPackEnum::n;
         $this->checkForOverSize(0xffff, $value);
         $this->insert($format, $value, $offset, $format->getLength());
+
+        return $this;
     }
 
-    public function writeInt16LE($value, int $offset = 0): void
+    public function writeInt16LE($value, ?int $offset = null): self
     {
+        if (null === $offset) {
+            $offset = $this->getLastEmptyPosition();
+        }
+
         $format = FormatPackEnum::v;
         $this->checkForOverSize(0xffff, $value);
         $this->insert($format, $value, $offset, $format->getLength());
+
+        return $this;
     }
 
-    public function writeInt32BE($value, int $offset = 0): void
+    public function writeInt32BE($value, ?int $offset = null): self
     {
+        if (null === $offset) {
+            $offset = $this->getLastEmptyPosition();
+        }
+
         $format = FormatPackEnum::N;
         $this->checkForOverSize(0xffffffff, $value);
         $this->insert($format, $value, $offset, $format->getLength());
+
+        return $this;
     }
 
-    public function writeInt32LE($value, int $offset = 0): void
+    public function writeInt32LE($value, ?int $offset = null): self
     {
+        if (null === $offset) {
+            $offset = $this->getLastEmptyPosition();
+        }
+
         $format = FormatPackEnum::V;
         $this->checkForOverSize(0xffffffff, $value);
         $this->insert($format, $value, $offset, $format->getLength());
+
+        return $this;
     }
 
     public function read(int $offset, int $length)
